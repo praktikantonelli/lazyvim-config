@@ -27,6 +27,8 @@ return {
 				end,
 				cwd = "${workspaceFolder}",
 				stopOnEntry = false,
+
+				sourceLanguages = { "rust" },
 			},
 		}
 		local dapui = require("dapui")
