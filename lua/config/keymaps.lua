@@ -48,16 +48,16 @@ local function insert_markdown_link()
 	end
 
 	-- get current cursor position, needed for insertion later
-	local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+	local row, _ = unpack(vim.api.nvim_win_get_cursor(0))
 	local line = vim.api.nvim_get_current_line()
 
 	-- find exact location of word under cursor
-	local match = vim.fn.matchstrpos(line, vim.pesc(cword))
+	local match = vim.fn.matchstrpos(line, cword)
 	local start_col, end_col = match[2], match[3]
 
 	if start_col == -1 then
-		start_col = col
-		end_col = col + #cword
+		vim.notify("could not find match in line!", vim.log.levels.ERROR)
+		return
 	end
 
 	-- get current file's directory, used for relative path computation
