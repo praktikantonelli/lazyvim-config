@@ -90,6 +90,9 @@ local function insert_markdown_link()
 
 					-- insert string into buffer
 					vim.api.nvim_buf_set_text(0, row - 1, start_col, row - 1, end_col, { markdown_link })
+
+					-- position cursor at end of inserted string
+					vim.api.nvim_win_set_cursor(0, { row, start_col + #markdown_link })
 				end
 			end,
 		},
