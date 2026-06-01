@@ -38,6 +38,7 @@ local function insert_markdown_link()
 		return
 	end
 
+	-- get WORD under cursor
 	local cword = vim.fn.expand("<cWORD>")
 	-- remove trailing punctuation, control and whitespace characters
 	cword = cword:gsub("[%p%c%s]+$", "")
@@ -46,9 +47,11 @@ local function insert_markdown_link()
 		return
 	end
 
+	-- get current cursor position, needed for insertion later
 	local row, col = unpack(vim.api.nvim_win_get_cursor(0))
 	local line = vim.api.nvim_get_current_line()
 
+	-- find exact location of word under cursor
 	local match = vim.fn.matchstrpos(line, vim.pesc(cword))
 	local start_col, end_col = match[2], match[3]
 
@@ -57,15 +60,19 @@ local function insert_markdown_link()
 		end_col = col + #cword
 	end
 
+	-- get current file's directory, used for relative path computation
 	local current_file_dir = vim.fn.expand("%:p:h")
 
+	-- open snacks.picker and insert word under cursor -> assume file name is word under cursor
 	snacks.picker.files({
 		search = cword, -- use current WORD under cursor as default input
 		actions = {
+			-- on confirm, get selected file's path and close the picker
 			confirm = function(picker, item)
 				picker:close()
 
 				if item and item.file then
+					-- extract file's path, then compute relative path
 					local target_path = tostring(item.file)
 					local rel_path = vim.fs.relpath(current_file_dir, target_path)
 
@@ -78,8 +85,10 @@ local function insert_markdown_link()
 						return
 					end
 
+					-- create exact string to be inserted
 					local markdown_link = string.format("[%s](%s)", cword, rel_path)
 
+					-- insert string into buffer
 					vim.api.nvim_buf_set_text(0, row - 1, start_col, row - 1, end_col, { markdown_link })
 				end
 			end,
