@@ -46,6 +46,19 @@ local function insert_markdown_link()
 		return
 	end
 
+	local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+	local line = vim.api.nvim_get_current_line()
+
+	local match = vim.fn.matchstrpos(line, vim.pesc(cword))
+	local start_col, end_col = match[2], match[3]
+
+	if start_col == -1 then
+		start_col = col
+		end_col = col + #cword
+	end
+
+	local current_file_dir = vim.fn.expand("%:p:h")
+
 	snacks.picker.files({
 		search = cword, -- use current WORD under cursor as default input
 		actions = {
@@ -53,8 +66,21 @@ local function insert_markdown_link()
 				picker:close()
 
 				if item and item.file then
-					local selected_path = item.file
-					vim.notify(selected_path, vim.log.levels.INFO)
+					local target_path = tostring(item.file)
+					local rel_path = vim.fs.relpath(current_file_dir, target_path)
+
+					if rel_path and not rel_path:match("^%.%.?/") then
+						rel_path = "./" .. rel_path
+					end
+
+					if not rel_path then
+						vim.notify("Could not calculate relative path", vim.log.levels.ERROR)
+						return
+					end
+
+					local markdown_link = string.format("[%s](%s)", cword, rel_path)
+
+					vim.api.nvim_buf_set_text(0, row - 1, start_col, row - 1, end_col, { markdown_link })
 				end
 			end,
 		},
