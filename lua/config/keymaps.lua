@@ -89,4 +89,4 @@ end
 
 map("n", "<Leader>rl", function()
 	insert_markdown_link()
-end)
+end, { desc = "Insert rel. link under cursor" })
