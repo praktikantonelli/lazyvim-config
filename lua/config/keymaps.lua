@@ -30,75 +30,102 @@ map("n", "<Leader>R", function()
 	overseer.run_template()
 end)
 
+local function relative_path(from_file, target_path)
+	local from = vim.split(vim.fs.dirname(vim.fs.normalize(vim.fs.abspath(from_file))), "/", {
+		plain = true,
+		trimempty = true,
+	})
+
+	local to = vim.split(vim.fs.normalize(vim.fs.abspath(target_path)), "/", {
+		plain = true,
+		trimempty = true,
+	})
+
+	local i = 1
+	while from[i] and from[i] == to[i] do
+		i = i + 1
+	end
+
+	local out = {}
+
+	for _ = i, #from do
+		out[#out + 1] = ".."
+	end
+
+	for j = i, #to do
+		out[#out + 1] = to[j]
+	end
+
+	return "./" .. table.concat(out, "/")
+end
+
+local function word_range_under_cursor(line, word, col)
+	local start = 1
+
+	while true do
+		local s, e = line:find(word, start, true)
+		if not s then
+			return nil
+		end
+
+		local start_col = s - 1
+		local end_col = e
+
+		if start_col <= col and col < end_col then
+			return start_col, end_col
+		end
+
+		start = e + 1
+	end
+end
+
 local function insert_markdown_link()
-	-- check if snacks.nvim's picker is available
-	local has_snacks, snacks = pcall(require, "snacks")
-	if not has_snacks then
+	local ok, snacks = pcall(require, "snacks")
+	if not ok then
 		vim.notify("snacks.nvim is not installed", vim.log.levels.ERROR)
 		return
 	end
 
-	-- get WORD under cursor
-	local cword = vim.fn.expand("<cWORD>")
-	-- remove trailing punctuation, control and whitespace characters
-	cword = cword:gsub("[%p%c%s]+$", "")
+	local cword = vim.fn.expand("<cWORD>"):gsub("[%p%c%s]+$", "")
 	if cword == "" then
 		vim.notify("no word under cursor", vim.log.levels.WARN)
 		return
 	end
 
-	-- get current cursor position, needed for insertion later
-	local row, _ = unpack(vim.api.nvim_win_get_cursor(0))
-	local line = vim.api.nvim_get_current_line()
-
-	-- find exact location of word under cursor
-	local match = vim.fn.matchstrpos(line, cword)
-	local start_col, end_col = match[2], match[3]
-
-	if start_col == -1 then
-		vim.notify("could not find match in line!", vim.log.levels.ERROR)
+	local current_file = vim.api.nvim_buf_get_name(0)
+	if current_file == "" then
+		vim.notify("current buffer has no file name", vim.log.levels.WARN)
 		return
 	end
 
-	-- get current file's directory, used for relative path computation
-	local current_file_dir = vim.fn.expand("%:p:h")
+	local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+	local line = vim.api.nvim_get_current_line()
+	local start_col, end_col = word_range_under_cursor(line, cword, col)
 
-	-- open snacks.picker and insert word under cursor -> assume file name is word under cursor
+	if start_col == nil or end_col == nil then
+		vim.notify("could not find word under cursor", vim.log.levels.ERROR)
+		return
+	end
+
 	snacks.picker.files({
-		search = cword, -- use current WORD under cursor as default input
+		search = cword,
+
 		actions = {
-			-- on confirm, get selected file's path and close the picker
 			confirm = function(picker, item)
 				picker:close()
 
-				if item and item.file then
-					-- extract file's path, then compute relative path
-					local target_path = tostring(item.file)
-					local rel_path = vim.fs.relpath(current_file_dir, target_path)
-
-					if rel_path and not rel_path:match("^%.%.?/") then
-						rel_path = "./" .. rel_path
-					end
-
-					if not rel_path then
-						vim.notify("Could not calculate relative path", vim.log.levels.ERROR)
-						return
-					end
-
-					-- create exact string to be inserted
-					local markdown_link = string.format("[%s](%s)", cword, rel_path)
-
-					-- insert string into buffer
-					vim.api.nvim_buf_set_text(0, row - 1, start_col, row - 1, end_col, { markdown_link })
-
-					-- position cursor at end of inserted string
-					vim.api.nvim_win_set_cursor(0, { row, start_col + #markdown_link })
+				if not item or not item.file then
+					return
 				end
+
+				local rel_path = relative_path(current_file, tostring(item.file))
+				local link = ("[%s](%s)"):format(cword, rel_path)
+
+				vim.api.nvim_buf_set_text(0, row - 1, start_col, row - 1, end_col, { link })
+				vim.api.nvim_win_set_cursor(0, { row, start_col + #link })
 			end,
 		},
 	})
 end
 
-map("n", "<Leader>rl", function()
-	insert_markdown_link()
-end, { desc = "Insert rel. link under cursor" })
+map("n", "<Leader>rl", insert_markdown_link, { desc = "Insert rel. link under cursor" })
