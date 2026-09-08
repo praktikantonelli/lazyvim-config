@@ -26,6 +26,8 @@ end)
 map("n", "<Leader>R", function()
 	overseer.run_template()
 end)
+map("t", "<Esc>", [[<C-\><C-n>]])
+map("t", "jj", [[<C-\><C-n>]])
 
 local function relative_path(from_file, target_path)
 	local from = vim.split(vim.fs.dirname(vim.fs.normalize(vim.fs.abspath(from_file))), "/", {
